@@ -1,3 +1,4 @@
+package sqlite3_raw_bindings
 /*
 ** 2001-09-15
 **
@@ -30,7 +31,6 @@
 ** the version number) and changes its name to "sqlite3.h" as
 ** part of the build process.
 */
-package sqlite
 
 import "core:c"
 
@@ -244,7 +244,13 @@ foreign lib {
 	**       passed as the 3rd and 4th callback parameters after it returns.
 	** </ul>
 	*/
-	sqlite3_exec :: proc(_: ^sqlite3, sql: cstring, callback: proc "c" (rawptr, i32, ^cstring, ^cstring) -> i32, _: rawptr, errmsg: ^cstring) -> i32 ---
+	sqlite3_exec :: proc(
+		_: ^sqlite3, 
+		sql: cstring, 
+		callback: proc "c" (rawptr, i32, ^cstring, ^cstring) -> i32, 
+		_: rawptr, 
+		errmsg: ^cstring
+	) -> i32 ---
 }
 
 /*
