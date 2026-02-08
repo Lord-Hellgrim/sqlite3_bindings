@@ -1,4 +1,4 @@
-package sqlite3_raw_bindings
+package raw_bindings
 /*
 ** 2001-09-15
 **

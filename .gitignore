@@ -1,2 +1,7 @@
 /ols.json
 /*.exe
+/sqlite3.def
+/sqlite3.dll
+/tests.pdb
+/tests.rdi
+/test_db

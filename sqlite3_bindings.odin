@@ -1,12 +1,13 @@
-package sqlite
+package sqlite3_bindings
 
 import "core:fmt"
 import "core:strings"
 import "core:slice"
 import "core:time"
 import "core:mem"
+import "core:reflect"
 
-import raw "raw_sqlite3_bindings"
+import raw "raw_bindings"
 
 SqliteStatus :: enum {
 
@@ -249,32 +250,32 @@ get_column_double :: proc(statement: ^Statement, column_number: i32) -> (f64, Sq
 }
 
 
-get_column_text :: proc(statement: ^Statement, column_number: i32) -> string {
+get_column_text :: proc(statement: ^Statement, column_number: i32) -> (string, SqliteStatus) {
 	
 	col_index := min(column_number, get_column_count(statement))
 	
 	col_type := get_column_type(statement, col_index)
 
 	if col_type != .TEXT {
-		return ""
+		return "", .ERROR
 	}
 
 	temp_string := raw.sqlite3_column_text(cast(^raw.sqlite3_stmt)statement, col_index)
 
 	str := strings.clone_from_cstring(temp_string)
 	
-	return str
+	return str, .OK
 
 }
 
-get_column_blob :: proc(statement: ^Statement, column_number: i32) -> []u8 {
+get_column_blob :: proc(statement: ^Statement, column_number: i32) -> ([]u8, SqliteStatus) {
 	
 	col_index := min(column_number, get_column_count(statement))
 	
 	col_type := get_column_type(statement, col_index)
 
 	if col_type != .BLOB {
-		return {}
+		return {}, .ERROR
 	}
 
 	temp_blob := raw.sqlite3_column_blob(cast(^raw.sqlite3_stmt)statement, col_index)
@@ -283,183 +284,94 @@ get_column_blob :: proc(statement: ^Statement, column_number: i32) -> []u8 {
 	blob: []u8 = make([]u8, temp_blob_len)
 	mem.copy(raw_data(blob), temp_blob, int(temp_blob_len))
 	
-	return blob
+	return blob, .OK
 
 }
 
+Result :: struct($T: typeid) {
+	value: T,
+	status: SqliteStatus,
+}
 
-test_binding_values :: proc() {
-
-	fmt.println("TEST BINDING -----------------------------------------------------")
+map_to_struct :: proc(db_pointer: ^Database, statement: ^Statement, $T: typeid) -> Result(T) {
+	value : T
+	value_rawptr := cast([^]u8)&value
 	
-	db, status := open_database("tests_database.db")
+	struct_fields_num := i32(reflect.struct_field_count(T))
+	alignment := i32(align_of(T))
 
-	if status != .OK {
-		panic("Couldn't open database")
+	if struct_fields_num != get_column_count(statement) {
+		return Result(T){value = value, status = .ERROR}
 	}
 
-    error_message := execute_one_shot(db, "CREATE TABLE expenses (texts TEXT, ints INTEGER, floats FLOAT);")
+	offsets := make([dynamic]i32)
+	defer delete(offsets)
 
-	sql_text := "INSERT INTO expenses (texts, ints, floats) VALUES (?,?,?), (?,?,?);"
+	current_offset: i32 = 0
 
-	stmt, prepare_status := prepare_statement(db, sql_text)
-
-	if prepare_status != .OK {
-		fmt.println(prepare_status)
-		return
-	}
-
-	Expense :: struct {
-		text: string,
-		integer: i32,
-		real: f32,
-	}
-
-	bind_status : SqliteStatus
-
-	bind_status = bind_text(stmt, "test1", 1)
-	bind_status = bind_int(stmt, 1, 2)
-	bind_status = bind_float(stmt, 1.0, 3)
-
-	bind_status = bind_text(stmt, "test2", 4)
-	bind_status = bind_int(stmt, 2, 5)
-	bind_status = bind_float(stmt, 2.0, 6)
-
-
-	for i in 0..<10{
-		step_status := step_statement(db, stmt)
-
-		fmt.println(status)
-
-		if step_status == .DONE {
-			break
+	struct_field_types := reflect.struct_field_types(T)
+	for r in i32(0)..<struct_fields_num {
+		if struct_field_types[r].id == i32 {
+			int_rawptr := cast(^i32)&value_rawptr[current_offset]
+			integer, int_status := get_column_int(statement, r)
+			if int_status == .ERROR {
+				result := Result(T){status = .ERROR}
+				return result	
+			}
+			int_rawptr^ = integer
+			current_offset += max(4, alignment)
+		} else if struct_field_types[r].id == f64 {
+			double_rawptr := cast(^f64)&value_rawptr[current_offset]
+			double, double_status := get_column_double(statement, r)
+			if double_status == .ERROR {
+				result := Result(T){status = .ERROR}
+				return result	
+			}
+			double_rawptr^ = double
+			current_offset += 8
+		} else if struct_field_types[r].id == string {
+			text_rawptr := cast(^string)&value_rawptr[current_offset]
+			text, text_status := get_column_text(statement, r)
+			if text_status == .ERROR {
+				result := Result(T){status = .ERROR}
+				return result	
+			}
+			text_rawptr^ = text
+			current_offset += 16
 		}
 	}
 
-	select, select_status := prepare_statement(db, "select * from expenses")
-
-	fmt.println("Got results:\n")
-	rows := 0
-	for (step_statement(db, select) != .DONE) {
-		i: i32
-		num_cols: i32 = get_column_count(select)
-		for i = 0; i < num_cols; i += 1 {
-			#partial switch (get_column_type(select, i))
-			{
-				case (.TEXT):
-					fmt.println(get_column_text(select, i))
-				case (.INTEGER):
-					fmt.println(get_column_int(select, i))
-				case (.FLOAT):
-					fmt.println(get_column_double(select, i))
-				case:
-					panic("not supposed to happen")
-            }
-		}
-		rows += 1
-	}
-
-	fmt.println(rows)
-
-    execute_one_shot(db, "DROP TABLE expenses;")
-
-
-	fmt.println("***************************************************************")
-
-}
-
-test_one_shot :: proc() {
-	fmt.println("TEST ONESHOT -----------------------------------------------------")
-
-	stmt: ^raw.sqlite3_stmt
-	
-	db, status := open_database("tests_database.db")
-
-	if db == nil {
-		fmt.println("Failed to open DB\n")
-		return
-	}
-
-	fmt.println("Performing query...\n")
-
-    error_message := execute_one_shot(db, "CREATE TALE expenses (texts TEXT, ints INTEGER, floats FLOAT);")
-
-	
-	fmt.println(error_message)
-	
-	if error_message == "near \"TALE\": syntax error" {
-		fmt.println("PASSED!!!")
-	}
-
-    execute_one_shot(db, "DROP TABLE expenses;")
-
-
-	fmt.println("***************************************************************")
-
+	return Result(T){value = value, status = .OK}
 }
 
 
-test_basic :: proc() {
-    fmt.println("TEST_BASIC ------------------------------------------------------")
-
-	db: ^raw.sqlite3
-	stmt: ^raw.sqlite3_stmt
-	
-	raw.sqlite3_open("tests_database.db", &db)
-
-	if db == nil {
-		fmt.println("Failed to open DB\n")
-		return
-	}
-
-	fmt.println("Performing query...\n")
-
-    raw.sqlite3_exec(db, "CREATE TABLE expenses (texts TEXT, ints INTEGER, floats FLOAT);", nil, nil, nil)
-    raw.sqlite3_exec(db, "INSERT INTO expenses (texts, ints, floats) VALUES (\"a\", 0, 0.0)", nil, nil, nil)
-    raw.sqlite3_exec(db, "INSERT INTO expenses (texts, ints, floats) VALUES (\"b\", 1, 1.0)", nil, nil, nil)
-    raw.sqlite3_exec(db, "INSERT INTO expenses (texts, ints, floats) VALUES (\"c\", 2, 2.0)", nil, nil, nil)
-
-	raw.sqlite3_prepare_v2(db, "select * from expenses", -1, &stmt, nil)
-	
-	fmt.println("Got results:\n")
-	for (raw.sqlite3_step(stmt) != raw.SQLITE_DONE) {
-		i: i32
-		num_cols: i32 = raw.sqlite3_column_count(stmt)
-		for i = 0; i < num_cols; i += 1 {
-			switch (raw.sqlite3_column_type(stmt, i))
-			{
-			case (raw.SQLITE3_TEXT):
-				fmt.println(raw.sqlite3_column_text(stmt, i))
-			case (raw.SQLITE_INTEGER):
-				fmt.println(raw.sqlite3_column_int(stmt, i))
-			case (raw.SQLITE_FLOAT):
-				fmt.println(raw.sqlite3_column_double(stmt, i))
-			case:
-                panic("not suppsed")
-            }
-		}
-		fmt.println("\n")
-
-	}
-
-	raw.sqlite3_finalize(stmt)
-
-    raw.sqlite3_exec(db, "DROP TABLE expenses;", nil, nil, nil)
-
-	raw.sqlite3_close(db)
-
-	fmt.println("***************************************************************")
-
-	return
-
-}
 
 
 main :: proc() {
-	
-	// test_basic()
 
-	test_binding_values()
+	db, db_status := open_database("temp.db")
+	
+	// execute_one_shot(db, "CREATE TABLE temp_table (price INTEGER, size FLOAT, name TEXT);")
+
+	// stmt, stmt_status := prepare_statement(db, "INSERT INTO temp_table (price, size, name) VALUES (1000, 3.14, \"PI\"), (2000, 6.28, \"TAU\");")
+
+	select, select_status := prepare_statement(db, "SELECT * FROM temp_table;")
+	step_statement(db, select)
+
+	Product :: struct {
+		price: i32,
+		size: f64,
+		name: string
+	}
+
+	struct_types := reflect.struct_field_types(Product)
+	for i in 0..<len(struct_types) {
+		fmt.println(struct_types[i])
+	}
+
+	result := map_to_struct(db, select, Product)
+
+	fmt.println(result.value)
 
 }
 
