@@ -48,34 +48,34 @@ SqliteStatus :: enum {
 status_from_int :: proc(#any_int i: int) -> SqliteStatus {
 	switch i {
 		case 0:   {return .OK}
-		case 1:   {return .ERROR      } 
-		case 2:   {return .INTERNAL   } 
-		case 3:   {return .PERM       } 
-		case 4:   {return .ABORT      } 
-		case 5:   {return .BUSY       } 
-		case 6:   {return .LOCKED     } 
-		case 7:   {return .NOMEM      } 
-		case 8:   {return .READONLY   } 
-		case 9:   {return .INTERRUPT  } 
-		case 10:  {return .IOERR      } 
-		case 11:  {return .CORRUPT    } 
-		case 12:  {return .NOTFOUND   } 
-		case 13:  {return .FULL       } 
-		case 14:  {return .CANTOPEN   } 
-		case 15:  {return .PROTOCOL   } 
-		case 16:  {return .EMPTY      } 
-		case 17:  {return .SCHEMA     } 
-		case 18:  {return .TOOBIG     } 
-		case 19:  {return .CONSTRAINT } 
-		case 20:  {return .MISMATCH   } 
-		case 21:  {return .MISUSE     } 
-		case 22:  {return .NOLFS      } 
-		case 23:  {return .AUTH       } 
-		case 24:  {return .FORMAT     } 
-		case 25:  {return .RANGE      } 
-		case 26:  {return .NOTADB     } 
-		case 27:  {return .NOTICE     } 
-		case 28:  {return .WARNING    } 
+		case 1:   {return .ERROR      }
+		case 2:   {return .INTERNAL   }
+		case 3:   {return .PERM       }
+		case 4:   {return .ABORT      }
+		case 5:   {return .BUSY       }
+		case 6:   {return .LOCKED     }
+		case 7:   {return .NOMEM      }
+		case 8:   {return .READONLY   }
+		case 9:   {return .INTERRUPT  }
+		case 10:  {return .IOERR      }
+		case 11:  {return .CORRUPT    }
+		case 12:  {return .NOTFOUND   }
+		case 13:  {return .FULL       }
+		case 14:  {return .CANTOPEN   }
+		case 15:  {return .PROTOCOL   }
+		case 16:  {return .EMPTY      }
+		case 17:  {return .SCHEMA     }
+		case 18:  {return .TOOBIG     }
+		case 19:  {return .CONSTRAINT }
+		case 20:  {return .MISMATCH   }
+		case 21:  {return .MISUSE     }
+		case 22:  {return .NOLFS      }
+		case 23:  {return .AUTH       }
+		case 24:  {return .FORMAT     }
+		case 25:  {return .RANGE      }
+		case 26:  {return .NOTADB     }
+		case 27:  {return .NOTICE     }
+		case 28:  {return .WARNING    }
 		case 100: {return .ROW        }
 		case 101: {return .DONE       }
 		case: {panic("Received invalid status code from alleged sqlite function")}
@@ -126,7 +126,7 @@ prepare_statement :: proc(db_pointer: ^Database, initial_sql: string) -> (^State
 	stmt : ^raw.sqlite3_stmt
 
 	error := raw.sqlite3_prepare_v2(cast(^raw.sqlite3)db_pointer, cstring(raw_data(initial_sql)), i32(len(initial_sql)), &stmt, nil)
-	
+
 	statement := cast(^Statement)stmt
 
 	return statement, .OK
@@ -224,9 +224,9 @@ get_column_type :: proc(statement: ^Statement, column_number: i32) -> SqliteType
 }
 
 get_column_int :: proc(statement: ^Statement, column_number: i32) -> (i32, SqliteStatus) {
-	
+
 	col_index := min(column_number, get_column_count(statement))
-	
+
 	col_type := get_column_type(statement, col_index)
 
 	if col_type != .INTEGER {
@@ -237,9 +237,9 @@ get_column_int :: proc(statement: ^Statement, column_number: i32) -> (i32, Sqlit
 }
 
 get_column_double :: proc(statement: ^Statement, column_number: i32) -> (f64, SqliteStatus) {
-	
+
 	col_index := min(column_number, get_column_count(statement))
-	
+
 	col_type := get_column_type(statement, col_index)
 
 	if col_type != .FLOAT {
@@ -251,9 +251,9 @@ get_column_double :: proc(statement: ^Statement, column_number: i32) -> (f64, Sq
 
 
 get_column_text :: proc(statement: ^Statement, column_number: i32) -> (string, SqliteStatus) {
-	
+
 	col_index := min(column_number, get_column_count(statement))
-	
+
 	col_type := get_column_type(statement, col_index)
 
 	if col_type != .TEXT {
@@ -263,15 +263,15 @@ get_column_text :: proc(statement: ^Statement, column_number: i32) -> (string, S
 	temp_string := raw.sqlite3_column_text(cast(^raw.sqlite3_stmt)statement, col_index)
 
 	str := strings.clone_from_cstring(temp_string)
-	
+
 	return str, .OK
 
 }
 
 get_column_blob :: proc(statement: ^Statement, column_number: i32) -> ([]u8, SqliteStatus) {
-	
+
 	col_index := min(column_number, get_column_count(statement))
-	
+
 	col_type := get_column_type(statement, col_index)
 
 	if col_type != .BLOB {
@@ -283,7 +283,7 @@ get_column_blob :: proc(statement: ^Statement, column_number: i32) -> ([]u8, Sql
 
 	blob: []u8 = make([]u8, temp_blob_len)
 	mem.copy(raw_data(blob), temp_blob, int(temp_blob_len))
-	
+
 	return blob, .OK
 
 }
@@ -293,10 +293,11 @@ Result :: struct($T: typeid) {
 	status: SqliteStatus,
 }
 
+// Struct fields must match table fields in the order they were declared in CREATE TABLE
 map_to_struct :: proc(db_pointer: ^Database, statement: ^Statement, $T: typeid) -> Result(T) {
 	value : T
 	value_rawptr := cast([^]u8)&value
-	
+
 	struct_fields_num := i32(reflect.struct_field_count(T))
 	alignment := i32(align_of(T))
 
@@ -316,7 +317,7 @@ map_to_struct :: proc(db_pointer: ^Database, statement: ^Statement, $T: typeid) 
 			integer, int_status := get_column_int(statement, r)
 			if int_status == .ERROR {
 				result := Result(T){status = .ERROR}
-				return result	
+				return result
 			}
 			int_rawptr^ = integer
 			current_offset += max(4, alignment)
@@ -325,19 +326,19 @@ map_to_struct :: proc(db_pointer: ^Database, statement: ^Statement, $T: typeid) 
 			double, double_status := get_column_double(statement, r)
 			if double_status == .ERROR {
 				result := Result(T){status = .ERROR}
-				return result	
+				return result
 			}
 			double_rawptr^ = double
-			current_offset += 8
+			current_offset += max(8, alignment)
 		} else if struct_field_types[r].id == string {
 			text_rawptr := cast(^string)&value_rawptr[current_offset]
 			text, text_status := get_column_text(statement, r)
 			if text_status == .ERROR {
 				result := Result(T){status = .ERROR}
-				return result	
+				return result
 			}
 			text_rawptr^ = text
-			current_offset += 16
+			current_offset += max(16, alignment)
 		}
 	}
 
@@ -350,19 +351,24 @@ map_to_struct :: proc(db_pointer: ^Database, statement: ^Statement, $T: typeid) 
 main :: proc() {
 
 	db, db_status := open_database("temp.db")
-	
-	// execute_one_shot(db, "CREATE TABLE temp_table (price INTEGER, size FLOAT, name TEXT);")
 
-	// stmt, stmt_status := prepare_statement(db, "INSERT INTO temp_table (price, size, name) VALUES (1000, 3.14, \"PI\"), (2000, 6.28, \"TAU\");")
+	// execute_one_shot(db, "DROP TABLE temp_table")
+
+	execute_one_shot(db, "CREATE TABLE temp_table (name TEXT, size FLOAT, price INTEGER);")
+
+	execute_one_shot(db, "INSERT INTO temp_table (name, size, price) VALUES (\"PI\", 3.14, 1000), (\"TAU\", 6.28, 2000);")
 
 	select, select_status := prepare_statement(db, "SELECT * FROM temp_table;")
 	step_statement(db, select)
 
 	Product :: struct {
-		price: i32,
+		name: string,
 		size: f64,
-		name: string
+		price: i32,
 	}
+
+	fmt.println(size_of(string))
+	fmt.println(align_of(string))
 
 	struct_types := reflect.struct_field_types(Product)
 	for i in 0..<len(struct_types) {
