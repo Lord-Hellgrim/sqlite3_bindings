@@ -348,36 +348,36 @@ map_to_struct :: proc(db_pointer: ^Database, statement: ^Statement, $T: typeid) 
 
 
 
-main :: proc() {
+// main :: proc() {
 
-	db, db_status := open_database("temp.db")
+// 	db, db_status := open_database("temp.db")
 
-	// execute_one_shot(db, "DROP TABLE temp_table")
+// 	// execute_one_shot(db, "DROP TABLE temp_table")
 
-	execute_one_shot(db, "CREATE TABLE temp_table (name TEXT, size FLOAT, price INTEGER);")
+// 	execute_one_shot(db, "CREATE TABLE temp_table (name TEXT, size FLOAT, price INTEGER);")
 
-	execute_one_shot(db, "INSERT INTO temp_table (name, size, price) VALUES (\"PI\", 3.14, 1000), (\"TAU\", 6.28, 2000);")
+// 	execute_one_shot(db, "INSERT INTO temp_table (name, size, price) VALUES (\"PI\", 3.14, 1000), (\"TAU\", 6.28, 2000);")
 
-	select, select_status := prepare_statement(db, "SELECT * FROM temp_table;")
-	step_statement(db, select)
+// 	select, select_status := prepare_statement(db, "SELECT * FROM temp_table;")
+// 	step_statement(db, select)
 
-	Product :: struct {
-		name: string,
-		size: f64,
-		price: i32,
-	}
+// 	Product :: struct {
+// 		name: string,
+// 		size: f64,
+// 		price: i32,
+// 	}
 
-	fmt.println(size_of(string))
-	fmt.println(align_of(string))
+// 	fmt.println(size_of(string))
+// 	fmt.println(align_of(string))
 
-	struct_types := reflect.struct_field_types(Product)
-	for i in 0..<len(struct_types) {
-		fmt.println(struct_types[i])
-	}
+// 	struct_types := reflect.struct_field_types(Product)
+// 	for i in 0..<len(struct_types) {
+// 		fmt.println(struct_types[i])
+// 	}
 
-	result := map_to_struct(db, select, Product)
+// 	result := map_to_struct(db, select, Product)
 
-	fmt.println(result.value)
+// 	fmt.println(result.value)
 
-}
+// }
 
