@@ -311,35 +311,40 @@ map_to_struct :: proc(db_pointer: ^Database, statement: ^Statement, $T: typeid) 
 
 	current_offset: i32 = 0
 
-	struct_field_types := reflect.struct_field_types(T)
+	struct_fields := reflect.struct_fields_zipped(T)
 	for r in i32(0)..<struct_fields_num {
-		if struct_field_types[r].id == i32 {
-			int_rawptr := cast(^i32)&value_rawptr[current_offset]
+		if struct_fields[r].type.id == i32 {
+			int_rawptr := cast(^i32)&value_rawptr[struct_fields[r].offset]
 			integer, int_status := get_column_int(statement, r)
 			if int_status == .ERROR {
 				result := Result(T){status = .ERROR}
 				return result
 			}
 			int_rawptr^ = integer
-			current_offset += max(4, alignment)
-		} else if struct_field_types[r].id == f64 {
-			double_rawptr := cast(^f64)&value_rawptr[current_offset]
+		} else if struct_fields[r].type.id == f64 {
+			double_rawptr := cast(^f64)&value_rawptr[struct_fields[r].offset]
 			double, double_status := get_column_double(statement, r)
 			if double_status == .ERROR {
 				result := Result(T){status = .ERROR}
 				return result
 			}
 			double_rawptr^ = double
-			current_offset += max(8, alignment)
-		} else if struct_field_types[r].id == string {
-			text_rawptr := cast(^string)&value_rawptr[current_offset]
+		} else if struct_fields[r].type.id == string {
+			text_rawptr := cast(^string)&value_rawptr[struct_fields[r].offset]
 			text, text_status := get_column_text(statement, r)
 			if text_status == .ERROR {
 				result := Result(T){status = .ERROR}
 				return result
 			}
 			text_rawptr^ = text
-			current_offset += max(16, alignment)
+		} else if struct_fields[r].type.id == []u8 {
+			blob_rawptr := cast(^[]u8)&value_rawptr[struct_fields[r].offset]
+			blob, blob_status := get_column_blob(statement, r)
+			if blob_status == .ERROR {
+				result := Result(T){status = .ERROR}
+				return result
+			}
+			blob_rawptr^ = blob
 		}
 	}
 
@@ -350,6 +355,43 @@ map_to_struct :: proc(db_pointer: ^Database, statement: ^Statement, $T: typeid) 
 
 main :: proc() {
 
-	
+	db, db_status := open_database("temp.db")
+
+	// execute_one_shot(db, "DROP TABLE temp_table")
+
+	execute_one_shot(db, "CREATE TABLE temp_table (name TEXT, size FLOAT, price INTEGER, picture BLOB);")
+
+	statement, status := prepare_statement(db, "INSERT INTO temp_table (name, size, price, picture) VALUES (\"PI\", 3.14, 1000, ?), (\"TAU\", 6.28, 2000, ?);")	
+	fmt.println(status)
+
+	bind_blob(statement, {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, 1)
+	bind_blob(statement, {11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1}, 2)
+
+	step_statement(db, statement)
+	step_statement(db, statement)
+	finalize_statement(statement)
+
+	select, select_status := prepare_statement(db, "SELECT * FROM temp_table;")
+	step_statement(db, select)
+
+	fmt.println(size_of(string))
+	fmt.println(align_of(string))
+
+	struct_types := reflect.struct_field_types(Product)
+	for i in 0..<len(struct_types) {
+		fmt.println(struct_types[i])
+	}
+
+	Product :: struct {
+		name: string,
+		size: f64,
+		price: i32,
+		picture: []u8
+	}
+
+	result := map_to_struct(db, select, Product)
+
+	fmt.println(result.value)
+
 }
 
