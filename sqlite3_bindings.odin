@@ -346,74 +346,10 @@ map_to_struct :: proc(db_pointer: ^Database, statement: ^Statement, $T: typeid) 
 	return Result(T){value = value, status = .OK}
 }
 
-Product :: struct {
-	name: string,
-	size: f64,
-	price: i32,
-}
-
-map_to_product ::proc(db: ^Database, statement: ^Statement) -> Product {
-
-	assert( get_column_count(statement) == 3)
-
-	product : Product
-
-	name, name_status := get_column_text(statement, 0)
-	size, size_status := get_column_double(statement, 1)
-	price, price_status := get_column_int(statement, 2)
-
-	product.price = price
-	product.size = size
-	product.name = name
-	
-	return product
-}
-
 
 
 main :: proc() {
 
-	db, db_status := open_database("temp.db")
-
-	// execute_one_shot(db, "DROP TABLE temp_table")
-
-	execute_one_shot(db, "CREATE TABLE temp_table (name TEXT, size FLOAT, price INTEGER);")
-
-	execute_one_shot(db, "INSERT INTO temp_table (name, size, price) VALUES (\"PI\", 3.14, 1000), (\"TAU\", 6.28, 2000);")
-
-	select, select_status := prepare_statement(db, "SELECT * FROM temp_table;")
-	step_statement(db, select)
-
-	fmt.println(size_of(string))
-	fmt.println(align_of(string))
-
-	struct_types := reflect.struct_field_types(Product)
-	for i in 0..<len(struct_types) {
-		fmt.println(struct_types[i])
-	}
-
-	stopwatch: time.Stopwatch
-	time.stopwatch_start(&stopwatch)
-	prod : Product
-	prods := make([]Product, 100_000)
-	for i in 0..<100_000 {
-		prods[i] = map_to_product(db, select)
-		
-	}
-	time.stopwatch_stop(&stopwatch)
-	fmt.println("Time of map_to_product: %v", stopwatch._accumulation)
-
 	
-	stopwatch2: time.Stopwatch
-	time.stopwatch_start(&stopwatch2)
-	result : Result(Product)
-	results := make([]Product, 100_000)
-	for i in 0..<100_000 {
-		result = map_to_struct(db, select, Product)
-		results[i] = result.value
-	}
-	time.stopwatch_stop(&stopwatch2)
-	fmt.println("Time of map_to_struct: %v", stopwatch2._accumulation)
-
 }
 
