@@ -289,13 +289,9 @@ get_column_blob :: proc(statement: ^Statement, column_number: i32) -> ([]u8, Sql
 
 }
 
-Result :: struct($T: typeid) {
-	value: T,
-	status: SqliteStatus,
-}
 
 // Struct fields must match table fields in the order they were declared in CREATE TABLE
-map_to_struct :: proc(db_pointer: ^Database, statement: ^Statement, $T: typeid) -> Result(T) {
+map_to_struct :: proc(db_pointer: ^Database, statement: ^Statement, $T: typeid) -> (T, SqliteStatus) {
 	value : T
 	value_rawptr := cast([^]u8)&value
 
@@ -303,7 +299,7 @@ map_to_struct :: proc(db_pointer: ^Database, statement: ^Statement, $T: typeid) 
 	alignment := i32(align_of(T))
 
 	if struct_fields_num != get_column_count(statement) {
-		return Result(T){value = value, status = .ERROR}
+		return value, .ERROR
 	}
 
 	offsets := make([dynamic]i32)
@@ -317,38 +313,34 @@ map_to_struct :: proc(db_pointer: ^Database, statement: ^Statement, $T: typeid) 
 			int_rawptr := cast(^i32)&value_rawptr[struct_fields[r].offset]
 			integer, int_status := get_column_int(statement, r)
 			if int_status == .ERROR {
-				result := Result(T){status = .ERROR}
-				return result
+				return value, .ERROR
 			}
 			int_rawptr^ = integer
 		} else if struct_fields[r].type.id == f64 {
 			double_rawptr := cast(^f64)&value_rawptr[struct_fields[r].offset]
 			double, double_status := get_column_double(statement, r)
 			if double_status == .ERROR {
-				result := Result(T){status = .ERROR}
-				return result
+				return value, .ERROR
 			}
 			double_rawptr^ = double
 		} else if struct_fields[r].type.id == string {
 			text_rawptr := cast(^string)&value_rawptr[struct_fields[r].offset]
 			text, text_status := get_column_text(statement, r)
 			if text_status == .ERROR {
-				result := Result(T){status = .ERROR}
-				return result
+				return value, .ERROR
 			}
 			text_rawptr^ = text
 		} else if struct_fields[r].type.id == []u8 {
 			blob_rawptr := cast(^[]u8)&value_rawptr[struct_fields[r].offset]
 			blob, blob_status := get_column_blob(statement, r)
 			if blob_status == .ERROR {
-				result := Result(T){status = .ERROR}
-				return result
+				return value, .ERROR
 			}
 			blob_rawptr^ = blob
 		}
 	}
 
-	return Result(T){value = value, status = .OK}
+	return value, .OK
 }
 
 
@@ -389,9 +381,9 @@ main :: proc() {
 		picture: []u8
 	}
 
-	result := map_to_struct(db, select, Product)
+	result, map_status := map_to_struct(db, select, Product)
 
-	fmt.println(result.value)
+	fmt.println(result)
 
 }
 
