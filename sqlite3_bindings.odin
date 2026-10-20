@@ -112,12 +112,12 @@ SqlQueryBuilder :: struct {
 }
 
 
-execute_one_shot :: proc(db_pointer: ^Database, sql_string: cstring) -> string {
+execute_one_shot :: proc(db_pointer: ^Database, sql_string: cstring, allocator := context.allocator) -> string {
 	errmsg: ^cstring = new(cstring)
 
 	raw.sqlite3_exec(cast(^raw.sqlite3)db_pointer, sql_string, nil, nil, errmsg)
 
-	error_message: string = strings.clone_from_cstring(errmsg^)
+	error_message: string = strings.clone_from_cstring(errmsg^, allocator = allocator)
 
 	return error_message
 
@@ -136,6 +136,11 @@ prepare_statement :: proc(db_pointer: ^Database, initial_sql: string) -> (^State
 step_statement :: proc(db_pointer: ^Database, statement: ^Statement) -> SqliteStatus {
 	status := raw.sqlite3_step(cast(^raw.sqlite3_stmt)statement)
 
+	return status_from_int(status)
+}
+
+reset_statement :: proc(statement: ^Statement) -> SqliteStatus {
+	status := raw.sqlite3_reset(cast(^raw.sqlite3_stmt)statement)
 	return status_from_int(status)
 }
 
